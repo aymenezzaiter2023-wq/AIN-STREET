@@ -1,0 +1,580 @@
+// Free, public brand site starter (FIXED)
+// Tech: React + Tailwind (uses shadcn/ui + lucide-react). Single-file component you can deploy on Netlify/Vercel/GitHub Pages.
+// What changed in this patch:
+// - Fixed BRAND syntax errors (missing comma after last product, unclosed arrays)
+// - Made social links optional-safe (no hard dependency on Facebook)
+// - Added safe fallbacks for empty/invalid image URLs
+// - Added lightweight runtime tests to validate BRAND structure during development
+// - Kept your custom brand data intact where possible
+
+import { useMemo, useState } from "react";
+import { motion } from "framer-motion";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import {
+  Sparkles,
+  ShoppingBag,
+  Phone,
+  Mail,
+  Instagram,
+  Facebook,
+  MapPin,
+  Menu,
+  X,
+  Star,
+  CheckCircle2,
+} from "lucide-react";
+
+// ---- Brand Config ---------------------------------------------------------
+const BRAND = {
+  name: "AIN-STREET",
+  tagline: "Bold. Local. Authentic.",
+  primary: "#0ea5e9", // Tailwind sky-500
+  accent: "#f59e0b", // amber-500
+  contactEmail: "ainstreet7@gmail.com",
+  phone: "+212 7 03 94 32 41",
+  location: "Casablanca, Morocco",
+  socials: {
+    instagram:
+      "https://www.instagram.com/aain_street?igsh=MTRuYXc1OTBqYnBhYw%3D%3D&utm_source=qr",
+    // TikTok provided by you (no lucide icon, we show a generic badge)
+    tiktok: "https://www.tiktok.com/@ainstreeet?_t=ZS-8z2PVrVa2q2&_r=1",
+    // facebook: "https://facebook.com/yourpage" // optional
+  },
+  hero: {
+    headline: "Eyes on the street",
+    sub: "Modern essentials crafted for everyday rebels.",
+    cta: "Shop Collection",
+    image: "", // you left this empty; a placeholder will be used
+  },
+  products: [
+    {
+      id: 1,
+      title: "1312 MARI",
+      price: "199 MAD",
+      img: "blob:https://web.whatsapp.com/4a720f35-088d-4fc4-b528-5bb59e930537",
+      tags: ["Unisex", "Premium Cotton"],
+    }, // <-- FIX: trailing comma added so the next key parses correctly
+  ],
+  features: [
+    {
+      icon: <CheckCircle2 className="w-5 h-5" />,
+      title: "Quality First",
+      desc: "Premium fabrics, durable stitching.",
+    },
+    {
+      icon: <CheckCircle2 className="w-5 h-5" />,
+      title: "Local Craft",
+      desc: "Designed with Casablanca energy.",
+    },
+    {
+      icon: <CheckCircle2 className="w-5 h-5" />,
+      title: "Fair Prices",
+      desc: "No hype tax. Just value.",
+    },
+  ],
+  gallery: [
+    "blob:https://web.whatsapp.com/e8b2e9ab-b88a-439b-84ab-639310771ea5",
+    "blob:https://web.whatsapp.com/4a720f35-088d-4fc4-b528-5bb59e930537",
+  ],
+  testimonials: [
+    { name: "Ghita", text: "kantsnaw dropppp", rating: 5 },
+    {
+      name: "Yassine",
+      text: "i think wahd mn ahssan designs li chft fchi tshirt brojola",
+      rating: 5,
+    },
+  ],
+  formAction: "", // e.g. https://formspree.io/f/xxxxxxx (keep empty to use mailto)
+};
+
+// Placeholders / fallbacks
+const PLACEHOLDER_IMG =
+  "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?q=80&w=1600&auto=format&fit=crop";
+const PLACEHOLDER_HERO =
+  "https://images.unsplash.com/photo-1503342217505-b0a15cf70489?q=80&w=2000&auto=format&fit=crop";
+
+// ---- Tiny Runtime Tests (dev only) ---------------------------------------
+function isValidUrl(u) {
+  try {
+    if (!u) return true; // optional
+    const url = new URL(u);
+    return ["http:", "https:", "blob:"].includes(url.protocol);
+  } catch {
+    return false;
+  }
+}
+
+function isValidProduct(p) {
+  return (
+    p &&
+    typeof p.id !== "undefined" &&
+    typeof p.title === "string" &&
+    typeof p.price === "string" &&
+    Array.isArray(p.tags) &&
+    isValidUrl(p.img)
+  );
+}
+
+function validateBrand(b) {
+  const results = [];
+  results.push(["has name", typeof b.name === "string" && b.name.length > 0]);
+  results.push([
+    "products is non-empty array",
+    Array.isArray(b.products) && b.products.length >= 1,
+  ]);
+  results.push([
+    "every product valid",
+    Array.isArray(b.products) && b.products.every(isValidProduct),
+  ]);
+  results.push([
+    "features is array",
+    Array.isArray(b.features) && b.features.length >= 1,
+  ]);
+  results.push([
+    "testimonials is array",
+    Array.isArray(b.testimonials) && b.testimonials.length >= 1,
+  ]);
+  results.push(["social links valid", isValidUrl(b.socials?.instagram) && isValidUrl(b.socials?.facebook) && isValidUrl(b.socials?.tiktok)]);
+  return results;
+}
+
+function runBrandTests() {
+  const isProd = typeof import.meta !== "undefined" && import.meta?.env?.PROD;
+  if (isProd) return; // dev-only tests
+
+  const results = validateBrand(BRAND);
+  const allPass = results.every(([, ok]) => !!ok);
+  console.groupCollapsed(
+    allPass ? "✅ BRAND checks passed" : "❌ BRAND checks failed"
+  );
+  for (const [name, ok] of results) {
+    console.log(ok ? "✅" : "❌", name);
+  }
+
+  // Extra test cases (ALWAYS add more when none):
+  const invalidProduct = { id: null, title: "", price: 0, img: "bad://url", tags: "nope" };
+  console.assert(
+    isValidProduct(invalidProduct) === false,
+    "Invalid product should fail validation"
+  );
+
+  const validProduct = {
+    id: 99,
+    title: "Test Tee",
+    price: "100 MAD",
+    img: PLACEHOLDER_IMG,
+    tags: ["Test"],
+  };
+  console.assert(
+    isValidProduct(validProduct) === true,
+    "Valid product should pass validation"
+  );
+
+  console.groupEnd();
+}
+runBrandTests();
+
+// ---- UI ------------------------------------------------------------------
+function StarRating({ value = 5 }) {
+  return (
+    <div className="flex items-center gap-1">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <Star key={i} className={`w-4 h-4 ${i < value ? "fill-current" : ""}`} />
+      ))}
+    </div>
+  );
+}
+
+function SocialLinks() {
+  const s = BRAND.socials || {};
+  const items = [
+    s.instagram && {
+      name: "Instagram",
+      href: s.instagram,
+      icon: <Instagram className="w-4 h-4" />,
+    },
+    s.facebook && { name: "Facebook", href: s.facebook, icon: <Facebook className="w-4 h-4" /> },
+    (s.tiktok || s.Tiktok) && {
+      name: "TikTok",
+      href: s.tiktok || s.Tiktok,
+      icon: <Sparkles className="w-4 h-4" />, // generic icon
+    },
+  ].filter(Boolean);
+
+  if (!items.length) return null;
+  return (
+    <div className="flex gap-3 pt-2 flex-wrap">
+      {items.map((it) => (
+        <a
+          key={it.name}
+          className="underline flex items-center gap-1"
+          href={it.href}
+          target="_blank"
+          rel="noreferrer"
+        >
+          {it.icon} {it.name}
+        </a>
+      ))}
+    </div>
+  );
+}
+
+function Nav({ open, setOpen }) {
+  return (
+    <div className="fixed top-0 left-0 right-0 z-40 backdrop-blur border-b bg-white/70 dark:bg-neutral-900/70">
+      <div className="max-w-6xl mx-auto px-4">
+        <div className="flex items-center justify-between h-16">
+          <a href="#top" className="font-bold text-lg tracking-tight">
+            {BRAND.name}
+          </a>
+          <div className="hidden md:flex items-center gap-6 text-sm">
+            <a href="#products" className="hover:opacity-80">
+              Products
+            </a>
+            <a href="#about" className="hover:opacity-80">
+              About
+            </a>
+            <a href="#gallery" className="hover:opacity-80">
+              Gallery
+            </a>
+            <a href="#contact" className="hover:opacity-80">
+              Contact
+            </a>
+            {/* Socials (optional) */}
+            <div className="flex items-center gap-3">
+              {BRAND.socials?.instagram && (
+                <a
+                  href={BRAND.socials.instagram}
+                  target="_blank"
+                  className="hover:opacity-80"
+                  rel="noreferrer"
+                >
+                  Instagram
+                </a>
+              )}
+              {BRAND.socials?.facebook && (
+                <a
+                  href={BRAND.socials.facebook}
+                  target="_blank"
+                  className="hover:opacity-80"
+                  rel="noreferrer"
+                >
+                  Facebook
+                </a>
+              )}
+              {(BRAND.socials?.tiktok || BRAND.socials?.Tiktok) && (
+                <a
+                  href={BRAND.socials.tiktok || BRAND.socials.Tiktok}
+                  target="_blank"
+                  className="hover:opacity-80"
+                  rel="noreferrer"
+                >
+                  TikTok
+                </a>
+              )}
+            </div>
+            <Button className="rounded-2xl" asChild>
+              <a href="#products">
+                <ShoppingBag className="w-4 h-4 mr-2" /> Shop
+              </a>
+            </Button>
+          </div>
+          <button
+            className="md:hidden p-2"
+            onClick={() => setOpen(!open)}
+            aria-label="Menu"
+          >
+            {open ? <X /> : <Menu />}
+          </button>
+        </div>
+        {open && (
+          <div className="md:hidden pb-4 flex flex-col gap-3">
+            <a href="#products" onClick={() => setOpen(false)}>
+              Products
+            </a>
+            <a href="#about" onClick={() => setOpen(false)}>
+              About
+            </a>
+            <a href="#gallery" onClick={() => setOpen(false)}>
+              Gallery
+            </a>
+            <a href="#contact" onClick={() => setOpen(false)}>
+              Contact
+            </a>
+            <SocialLinks />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default function BrandWebsite() {
+  const [open, setOpen] = useState(false);
+  const themeVars = useMemo(
+    () => ({
+      "--brand": BRAND.primary,
+      "--accent": BRAND.accent,
+    }),
+    []
+  );
+
+  const heroImg = BRAND.hero.image || PLACEHOLDER_HERO;
+
+  return (
+    <div
+      id="top"
+      style={themeVars}
+      className="text-neutral-800 dark:text-neutral-100 bg-white dark:bg-neutral-950 selection:bg-[color:var(--brand)]/20"
+    >
+      <Nav open={open} setOpen={setOpen} />
+
+      {/* Hero */}
+      <section className="relative pt-28 md:pt-32">
+        <div className="absolute inset-0 -z-10 bg-gradient-to-b from-[color:var(--brand)]/10 via-transparent to-transparent" />
+        <div className="max-w-6xl mx-auto px-4 grid md:grid-cols-2 gap-10 items-center">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+          >
+            <Badge className="mb-4 bg-[color:var(--brand)]/15 text-[color:var(--brand)] border-none">
+              <Sparkles className="w-4 h-4 mr-1" /> {BRAND.tagline}
+            </Badge>
+            <h1 className="text-4xl md:text-6xl font-extrabold leading-tight">
+              {BRAND.hero.headline}
+            </h1>
+            <p className="mt-4 text-lg md:text-xl text-neutral-600 dark:text-neutral-300">
+              {BRAND.hero.sub}
+            </p>
+            <div className="mt-6 flex gap-3">
+              <Button
+                size="lg"
+                className="rounded-2xl bg-[color:var(--brand)] hover:opacity-90"
+                asChild
+              >
+                <a href="#products">
+                  <ShoppingBag className="w-4 h-4 mr-2" /> {BRAND.hero.cta}
+                </a>
+              </Button>
+              <Button size="lg" variant="outline" className="rounded-2xl" asChild>
+                <a href="#contact">
+                  <Phone className="w-4 h-4 mr-2" /> Contact
+                </a>
+              </Button>
+            </div>
+            <div className="mt-6 flex items-center gap-6 text-sm text-neutral-600 dark:text-neutral-300">
+              <div className="flex items-center gap-2">
+                <MapPin className="w-4 h-4" /> {BRAND.location}
+              </div>
+              <div className="flex items-center gap-2">
+                <Mail className="w-4 h-4" /> {BRAND.contactEmail}
+              </div>
+            </div>
+          </motion.div>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+          >
+            <div className="relative">
+              <img
+                src={heroImg}
+                alt="Hero"
+                className="rounded-3xl shadow-2xl w-full object-cover aspect-[4/3]"
+                onError={(e) => {
+                  e.currentTarget.src = PLACEHOLDER_HERO;
+                }}
+              />
+              <div className="absolute inset-0 rounded-3xl ring-1 ring-white/40 dark:ring-white/10 pointer-events-none" />
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Features */}
+      <section id="about" className="max-w-6xl mx-auto px-4 mt-16 md:mt-24">
+        <div className="grid md:grid-cols-3 gap-4">
+          {BRAND.features.map((f, i) => (
+            <Card key={i} className="rounded-2xl">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  {f.icon} {f.title}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="text-neutral-600 dark:text-neutral-300">
+                {f.desc}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </section>
+
+      {/* Products */}
+      <section id="products" className="max-w-6xl mx-auto px-4 mt-16 md:mt-24">
+        <div className="flex items-end justify-between mb-6">
+          <div>
+            <h2 className="text-2xl md:text-3xl font-bold">Featured Products</h2>
+            <p className="text-neutral-600 dark:text-neutral-300">
+              Handpicked drops available now.
+            </p>
+          </div>
+          <a href="#contact" className="text-sm underline">
+            Wholesale?
+          </a>
+        </div>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {BRAND.products.map((p) => (
+            <Card key={p.id} className="rounded-2xl overflow-hidden group">
+              <div className="relative">
+                <img
+                  src={p.img || PLACEHOLDER_IMG}
+                  alt={p.title}
+                  className="w-full aspect-square object-cover group-hover:scale-[1.02] transition"
+                  onError={(e) => {
+                    e.currentTarget.src = PLACEHOLDER_IMG;
+                  }}
+                />
+                <div className="absolute top-3 left-3 flex gap-2">
+                  {p.tags.map((t, i) => (
+                    <Badge
+                      key={i}
+                      className="bg-black/70 text-white border-none rounded-full"
+                    >
+                      {t}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg">{p.title}</CardTitle>
+              </CardHeader>
+              <CardContent className="flex items-center justify-between">
+                <span className="font-semibold">{p.price}</span>
+                <Button className="rounded-xl" variant="secondary">
+                  <ShoppingBag className="w-4 h-4 mr-2" /> Add to Cart
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </section>
+
+      {/* Gallery */}
+      <section id="gallery" className="max-w-6xl mx-auto px-4 mt-16 md:mt-24">
+        <h2 className="text-2xl md:text-3xl font-bold mb-6">Lookbook</h2>
+        <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4">
+          {BRAND.gallery.map((g, i) => (
+            <motion.img
+              key={i}
+              src={g || PLACEHOLDER_IMG}
+              alt={`Gallery ${i + 1}`}
+              className="rounded-2xl w-full object-cover aspect-[4/5]"
+              onError={(e) => {
+                e.currentTarget.src = PLACEHOLDER_IMG;
+              }}
+              initial={{ opacity: 0, scale: 0.98 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.4, delay: i * 0.05 }}
+            />
+          ))}
+        </div>
+      </section>
+
+      {/* Testimonials */}
+      <section className="max-w-6xl mx-auto px-4 mt-16 md:mt-24">
+        <h2 className="text-2xl md:text-3xl font-bold mb-6">What people say</h2>
+        <div className="grid md:grid-cols-3 gap-4">
+          {BRAND.testimonials.map((t, i) => (
+            <Card key={i} className="rounded-2xl">
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <span>{t.name}</span>
+                  <StarRating value={t.rating} />
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="text-neutral-600 dark:text-neutral-300">
+                {t.text}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </section>
+
+      {/* Contact */}
+      <section id="contact" className="max-w-6xl mx-auto px-4 mt-16 md:mt-24">
+        <div className="grid md:grid-cols-2 gap-8 items-start">
+          <div>
+            <h2 className="text-2xl md:text-3xl font-bold">Let's talk</h2>
+            <p className="mt-2 text-neutral-600 dark:text-neutral-300">
+              Collaborations, bulk orders, or questions — send us a message.
+            </p>
+            <div className="mt-6 space-y-2 text-sm">
+              <div className="flex items-center gap-2">
+                <Phone className="w-4 h-4" /> {BRAND.phone}
+              </div>
+              <div className="flex items-center gap-2">
+                <Mail className="w-4 h-4" /> {BRAND.contactEmail}
+              </div>
+              <div className="flex items-center gap-2">
+                <MapPin className="w-4 h-4" /> {BRAND.location}
+              </div>
+              <SocialLinks />
+            </div>
+          </div>
+          <Card className="rounded-2xl">
+            <CardContent className="pt-6">
+              <form
+                method={BRAND.formAction ? "POST" : "GET"}
+                action={BRAND.formAction || `mailto:${BRAND.contactEmail}`}
+                className="space-y-3"
+              >
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <Input name="name" placeholder="Your name" required />
+                  <Input type="email" name="email" placeholder="Email" required />
+                </div>
+                <Input name="subject" placeholder="Subject" />
+                <Textarea name="message" placeholder="Your message" rows={5} required />
+                <Button
+                  type="submit"
+                  className="rounded-2xl bg-[color:var(--brand)] hover:opacity-90"
+                >
+                  Send Message
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="mt-20">
+        <div className="max-w-6xl mx-auto px-4 py-10 border-t">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="text-sm">
+              © {new Date().getFullYear()} {BRAND.name}. All rights reserved.
+            </div>
+            <div className="flex items-center gap-3 text-sm">
+              <a className="hover:underline" href="#about">
+                About
+              </a>
+              <a className="hover:underline" href="#products">
+                Products
+              </a>
+              <a className="hover:underline" href="#contact">
+                Contact
+              </a>
+            </div>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+}
